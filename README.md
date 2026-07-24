@@ -703,6 +703,16 @@ Full technical documentation at **[docs.neuralcleave.com](https://docs.neuralcle
 
 ---
 
+## Sponsors
+
+NeuralCleave is built and maintained by a solo developer. If it's useful to you, [sponsoring on GitHub](https://github.com/sponsors/TheAmitChandra) directly funds the time spent on new channel adapters, LLM provider integrations, and keeping the memory system solid.
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/TheAmitChandra)
+
+*Sponsors at the README tier will be listed here.*
+
+---
+
 ## License
 
 [Business Source License 1.1](LICENSE) — free for non-production use (development, evaluation, personal use). Production use requires a commercial license — contact [ask.amitchandra@gmail.com](mailto:ask.amitchandra@gmail.com). Converts automatically to Apache 2.0 on 2030-06-26.
