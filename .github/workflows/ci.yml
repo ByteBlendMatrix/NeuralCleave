@@ -25,8 +25,3 @@ jobs:
   plugins:
     uses: ./.github/workflows/ci-plugins.yml
 
-  docker:
-    uses: ./.github/workflows/ci-docker.yml
-    needs: [lint-test, sdk, plugins]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    secrets: inherit
