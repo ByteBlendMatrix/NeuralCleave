@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Menu, RotateCcw } from "lucide-react";
+import { Activity, Keyboard, Menu, RotateCcw } from "lucide-react";
 import api from "@/lib/api";
+import { ShortcutsModal } from "@/components/layout/ShortcutsModal";
 
 interface GatewayStatus {
   status: string;
@@ -22,6 +23,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const mountTimeRef = useRef(Date.now());
   const [secondsSinceMount, setSecondsSinceMount] = useState(0);
   const [retrying, setRetrying] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   // Tick every second so the countdown label stays live.
   useEffect(() => {
@@ -48,6 +50,24 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   });
 
   const online = !isError && data?.status === "ok";
+
+  // Global Ctrl+/ shortcut to toggle the shortcuts panel.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "/") {
+        e.preventDefault();
+        setShortcutsOpen((o) => !o);
+      }
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA") {
+          setShortcutsOpen((o) => !o);
+        }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   const handleRetry = useCallback(() => {
     setRetrying(true);
@@ -89,6 +109,14 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             Retry
           </button>
         )}
+        <button
+          onClick={() => setShortcutsOpen(true)}
+          className="rounded-md p-1.5 text-slate-600 hover:bg-slate-800 hover:text-slate-300"
+          title="Keyboard shortcuts (Ctrl+/)"
+          aria-label="Open keyboard shortcuts"
+        >
+          <Keyboard className="h-3.5 w-3.5" />
+        </button>
         <Activity className="h-4 w-4 text-slate-500" />
         <span
           className={`hidden text-xs font-medium sm:inline ${
@@ -107,6 +135,11 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           }`}
         />
       </div>
+
+      <ShortcutsModal
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
     </header>
   );
 }
