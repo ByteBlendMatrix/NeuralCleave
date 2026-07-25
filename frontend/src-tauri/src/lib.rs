@@ -115,9 +115,28 @@ pub fn run() {
       // bundle_backend.ps1 first.
       match app.shell().sidecar("neuralcleave-backend") {
         Ok(cmd) => match cmd.spawn() {
-          Ok((_rx, child)) => {
+          Ok((mut rx, child)) => {
             log::info!("neuralcleave-backend sidecar started");
             *app.state::<BackendProcess>().0.lock().unwrap() = Some(child);
+            // Drain the sidecar's stdout/stderr pipes in a background task.
+            // Without this, on Windows the 4 KB pipe buffer fills with uvicorn
+            // startup logs and the backend process stalls — causing the
+            // "Connecting…" spinner to never resolve.
+            tauri::async_runtime::spawn(async move {
+              use tauri_plugin_shell::process::CommandEvent;
+              while let Some(event) = rx.recv().await {
+                match event {
+                  CommandEvent::Stdout(line) => {
+                    log::debug!("backend: {}", String::from_utf8_lossy(&line));
+                  }
+                  CommandEvent::Stderr(line) => {
+                    log::debug!("backend stderr: {}", String::from_utf8_lossy(&line));
+                  }
+                  CommandEvent::Terminated(_) => break,
+                  _ => {}
+                }
+              }
+            });
           }
           Err(e) => log::warn!("could not spawn neuralcleave-backend sidecar: {e}"),
         },
