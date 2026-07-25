@@ -16,7 +16,7 @@ from neuralcleave.canvas.routes import page_router as canvas_page_router
 from neuralcleave.canvas.routes import set_canvas_renderer
 from neuralcleave.config import NeuralCleaveConfig, load_config
 from neuralcleave.gateway.routes import router as api_router
-from neuralcleave.gateway.routes import set_runtime
+from neuralcleave.gateway.routes import set_hub_installer, set_plugin_registry, set_runtime
 from neuralcleave.gateway.terminal import router as terminal_router
 from neuralcleave.gateway.websocket import get_manager
 from neuralcleave.gateway.websocket import router as ws_router
@@ -63,6 +63,25 @@ def _build_lifespan(cfg: NeuralCleaveConfig):
             logger.error("runtime startup failed (%s) — serving without agent", exc)
             app.state.runtime = None
 
+        # Wire the plugin registry and hub installer so their REST routes
+        # serve live data instead of 503 / available:false.  Both are
+        # initialised after the runtime so a plugin-load failure never
+        # prevents the agent from starting.
+        try:
+            from neuralcleave.hub.installer import HubInstaller
+            from neuralcleave.plugins.registry import PluginRegistry
+
+            plugin_registry = PluginRegistry()
+            plugin_registry.discover()
+            await plugin_registry.load_all()
+            set_plugin_registry(plugin_registry)
+
+            hub_installer = HubInstaller(plugin_registry=plugin_registry)
+            set_hub_installer(hub_installer)
+            logger.info("PluginRegistry and HubInstaller wired successfully")
+        except Exception as exc:
+            logger.error("plugin/hub startup failed (%s) — serving without plugins", exc)
+
         try:
             yield
         finally:
@@ -73,6 +92,8 @@ def _build_lifespan(cfg: NeuralCleaveConfig):
                 except Exception as exc:
                     logger.warning("runtime shutdown error: %s", exc)
             set_runtime(None)
+            set_plugin_registry(None)
+            set_hub_installer(None)
             set_canvas_renderer(None)
             await manager.stop()
             logger.info("NeuralCleave Gateway v2 stopped")
