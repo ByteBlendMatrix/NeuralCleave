@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { GatewayToast } from "@/components/layout/GatewayToast";
 import { gatewayWS } from "@/lib/websocket";
 import { sendDesktopNotification } from "@/lib/notifications";
 import { setUnreadBadge } from "@/lib/trayBadge";
@@ -66,6 +67,7 @@ export default function DashboardShellLayout({
         <Topbar onMenuClick={() => setMobileNavOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
       </div>
+      <GatewayToast />
     </div>
   );
 }
