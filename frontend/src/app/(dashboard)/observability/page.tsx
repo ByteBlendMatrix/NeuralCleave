@@ -121,7 +121,7 @@ export default function ObservabilityPage() {
           <p className="mt-1 text-sm text-slate-400">
             Prometheus metrics snapshot · Structured JSON logs via{" "}
             <code className="rounded bg-slate-800 px-1 py-0.5 text-xs">
-              cortex status
+              neuralcleave status
             </code>
           </p>
         </div>
