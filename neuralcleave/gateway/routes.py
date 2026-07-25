@@ -757,12 +757,35 @@ async def route_orchestrator_task(body: dict) -> dict:
 
 @router.get("/orchestrator/status")
 async def orchestrator_status() -> dict:
-    """Return routing statistics for the orchestrator."""
+    """Return routing statistics for the orchestrator.
+
+    Includes UI-friendly aliases consumed by the web dashboard:
+    - ``total_nodes``: total registered node count (same as ``node_count``)
+    - ``enabled_nodes``: count of nodes with ``enabled=True``
+    - ``nodes``: full node config dicts (replaces the lightweight stats-only
+      list from ``orch.stats()`` so the UI can render priority, task_types, etc.)
+    """
     orch = get_orchestrator()
     if orch is None:
-        return {"available": False, "total_routed": 0, "node_count": 0}
+        return {
+            "available": False,
+            "total_routed": 0,
+            "node_count": 0,
+            "total_nodes": 0,
+            "enabled_nodes": 0,
+            "nodes": [],
+            "namespaces": {},
+        }
     stats = orch.stats()
     stats["available"] = True
+    # list_nodes() returns AgentNodeConfig objects directly (not AgentNode wrappers)
+    node_list = orch.list_nodes()
+    # UI aliases — the raw stats() dict uses node_count; web UI reads total_nodes
+    stats["total_nodes"] = len(node_list)
+    stats["enabled_nodes"] = sum(1 for n in node_list if n.enabled)
+    # Replace lightweight stats-only node entries with full config dicts so the
+    # web UI can render priority, task_types, memory_namespace, etc.
+    stats["nodes"] = [n.to_dict() for n in node_list]
     return stats
 
 

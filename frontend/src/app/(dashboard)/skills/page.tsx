@@ -135,7 +135,7 @@ export default function SkillsPage() {
           <p className="mt-2 text-xs text-slate-600">
             Run{" "}
             <code className="rounded bg-slate-800 px-1.5 py-0.5">
-              cortex hub install &lt;url&gt;
+              neuralcleave hub install &lt;url&gt;
             </code>{" "}
             to add one.
           </p>

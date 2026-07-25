@@ -182,7 +182,7 @@ export default function ChannelsPage() {
         <p className="mt-1 text-sm text-slate-400">
           Connected messaging platforms — add or remove via{" "}
           <code className="rounded bg-slate-800 px-1 py-0.5 text-xs">
-            cortex channels add
+            neuralcleave channels add
           </code>
         </p>
       </div>
@@ -199,7 +199,7 @@ export default function ChannelsPage() {
       ) : isError ? (
         <div className="rounded-xl border border-rose-800 bg-rose-900/20 p-6 text-sm text-rose-300">
           Could not reach the gateway. Make sure{" "}
-          <code className="rounded bg-rose-800/40 px-1">cortex start</code> is
+          <code className="rounded bg-rose-800/40 px-1">neuralcleave start</code> is
           running.
         </div>
       ) : channels.length === 0 ? (
@@ -209,7 +209,7 @@ export default function ChannelsPage() {
           <p className="mt-1 text-xs text-slate-600">
             Run{" "}
             <code className="rounded bg-slate-800 px-1 py-0.5">
-              cortex channels add telegram
+              neuralcleave channels add telegram
             </code>{" "}
             to add your first channel.
           </p>

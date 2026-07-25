@@ -11,14 +11,25 @@ from neuralcleave import __version__
 from neuralcleave.agent.runtime import AgentRuntime
 from neuralcleave.config import NeuralCleaveConfig
 from neuralcleave.gateway.main import create_app, run
-from neuralcleave.gateway.routes import get_runtime, set_runtime
+from neuralcleave.gateway.routes import (
+    get_hub_installer,
+    get_plugin_registry,
+    get_runtime,
+    set_hub_installer,
+    set_plugin_registry,
+    set_runtime,
+)
 
 
 @pytest.fixture(autouse=True)
-def reset_runtime():
+def reset_singletons():
     set_runtime(None)
+    set_plugin_registry(None)
+    set_hub_installer(None)
     yield
     set_runtime(None)
+    set_plugin_registry(None)
+    set_hub_installer(None)
 
 
 def make_fake_runtime() -> MagicMock:
@@ -186,3 +197,90 @@ def test_run_uses_default_config_when_none_given():
         run()
 
     mock_uvicorn_run.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Lifespan — PluginRegistry and HubInstaller wiring
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_plugin_registry() -> MagicMock:
+    pr = MagicMock()
+    pr.discover = MagicMock(return_value=[])
+    pr.load_all = AsyncMock(return_value=0)
+    return pr
+
+
+def _make_fake_hub_installer() -> MagicMock:
+    return MagicMock()
+
+
+def test_lifespan_wires_plugin_registry_on_startup():
+    """PluginRegistry must be injected into routes during lifespan startup."""
+    app = create_app(NeuralCleaveConfig())
+    fake_pr = _make_fake_plugin_registry()
+
+    with (
+        patch.object(AgentRuntime, "from_config", return_value=make_fake_runtime()),
+        patch("neuralcleave.plugins.registry.PluginRegistry", return_value=fake_pr),
+        patch("neuralcleave.hub.installer.HubInstaller", return_value=_make_fake_hub_installer()),
+    ):
+        with TestClient(app):
+            assert get_plugin_registry() is fake_pr
+
+    assert get_plugin_registry() is None  # cleared on shutdown
+
+
+def test_lifespan_wires_hub_installer_on_startup():
+    """HubInstaller must be injected into routes during lifespan startup."""
+    app = create_app(NeuralCleaveConfig())
+    fake_pr = _make_fake_plugin_registry()
+    fake_hi = _make_fake_hub_installer()
+
+    with (
+        patch.object(AgentRuntime, "from_config", return_value=make_fake_runtime()),
+        patch("neuralcleave.plugins.registry.PluginRegistry", return_value=fake_pr),
+        patch("neuralcleave.hub.installer.HubInstaller", return_value=fake_hi),
+    ):
+        with TestClient(app):
+            assert get_hub_installer() is fake_hi
+
+    assert get_hub_installer() is None  # cleared on shutdown
+
+
+def test_lifespan_plugin_startup_failure_does_not_crash_gateway():
+    """A broken plugin setup must not prevent the gateway from serving."""
+    app = create_app(NeuralCleaveConfig())
+
+    with (
+        patch.object(AgentRuntime, "from_config", return_value=make_fake_runtime()),
+        patch(
+            "neuralcleave.plugins.registry.PluginRegistry",
+            side_effect=RuntimeError("plugin import error"),
+        ),
+    ):
+        with TestClient(app) as client:
+            resp = client.get("/health")
+            assert resp.status_code == 200
+            # Registry not set — plugins unavailable but gateway still up
+            assert get_plugin_registry() is None
+            assert get_hub_installer() is None
+
+
+def test_lifespan_plugins_cleared_on_shutdown_even_after_error():
+    """set_plugin_registry(None) must be called even if runtime.stop() raises."""
+    app = create_app(NeuralCleaveConfig())
+    fake_pr = _make_fake_plugin_registry()
+    fake_runtime = make_fake_runtime()
+    fake_runtime.stop = AsyncMock(side_effect=Exception("stop error"))
+
+    with (
+        patch.object(AgentRuntime, "from_config", return_value=fake_runtime),
+        patch("neuralcleave.plugins.registry.PluginRegistry", return_value=fake_pr),
+        patch("neuralcleave.hub.installer.HubInstaller", return_value=_make_fake_hub_installer()),
+    ):
+        with TestClient(app):
+            pass  # entering/exiting triggers lifespan
+
+    assert get_plugin_registry() is None
+    assert get_hub_installer() is None

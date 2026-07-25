@@ -201,7 +201,7 @@ export default function DashboardPage() {
             <p className="text-sm text-slate-500">
               No channels configured. Run{" "}
               <code className="rounded bg-slate-800 px-1 py-0.5 text-xs">
-                cortex channels add
+                neuralcleave channels add
               </code>{" "}
               to add one.
             </p>

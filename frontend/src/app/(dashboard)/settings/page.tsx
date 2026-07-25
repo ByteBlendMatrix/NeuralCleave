@@ -377,7 +377,7 @@ function VoiceSection({
             type="text"
             value={values["Wake Word"] ?? ""}
             onChange={(e) => onChange("voice", "Wake Word", e.target.value)}
-            placeholder="e.g. hey cortex"
+            placeholder="e.g. hey neural"
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:w-72"
           />
         </div>

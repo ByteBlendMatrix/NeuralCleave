@@ -3,6 +3,12 @@ name: CI
 on:
   push:
     branches: ["**"]
+    paths-ignore:
+      - "docs-site/**"
+      - "docs/**"
+      - "**/*.md"
+      - ".github/FUNDING.yml"
+      - ".github/ISSUE_TEMPLATE/**"
   pull_request:
     branches: [main]
 
