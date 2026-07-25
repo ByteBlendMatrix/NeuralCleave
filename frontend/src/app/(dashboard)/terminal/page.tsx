@@ -13,7 +13,7 @@ function getTerminalWsUrl(): string {
     const saved = localStorage.getItem(SETTINGS_KEY);
     if (saved) {
       const settings = JSON.parse(saved) as Record<string, Record<string, string>>;
-      const apiBase = settings?.api?.["API Base URL"];
+      const apiBase = settings?.api?.["Backend API URL"];
       if (apiBase) {
         const wsBase = apiBase.replace(/^https?/, (p: string) =>
           p === "https" ? "wss" : "ws"
