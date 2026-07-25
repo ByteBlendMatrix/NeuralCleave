@@ -15,8 +15,14 @@ from neuralcleave.canvas.routes import api_router as canvas_api_router
 from neuralcleave.canvas.routes import page_router as canvas_page_router
 from neuralcleave.canvas.routes import set_canvas_renderer
 from neuralcleave.config import NeuralCleaveConfig, load_config
-from neuralcleave.gateway.routes import router as api_router
-from neuralcleave.gateway.routes import set_hub_installer, set_plugin_registry, set_runtime
+from neuralcleave.gateway.routes import (
+    router as api_router,
+)
+from neuralcleave.gateway.routes import (
+    set_hub_installer,
+    set_plugin_registry,
+    set_runtime,
+)
 from neuralcleave.gateway.terminal import router as terminal_router
 from neuralcleave.gateway.websocket import get_manager
 from neuralcleave.gateway.websocket import router as ws_router

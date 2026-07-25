@@ -1,7 +1,14 @@
 name: Docker
 
 on:
-  workflow_call:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs-site/**"
+      - "docs/**"
+      - "**/*.md"
+      - ".github/FUNDING.yml"
+      - ".github/ISSUE_TEMPLATE/**"
 
 jobs:
   docker:
