@@ -26,13 +26,13 @@ function getTerminalWsUrl(): string {
 }
 
 const QUICK_ACTIONS = [
-  { label: "status", cmd: "cortex status" },
-  { label: "channels list", cmd: "cortex channels list" },
-  { label: "skills list", cmd: "cortex skills list" },
-  { label: "plugins list", cmd: "cortex plugins list" },
-  { label: "memory stats", cmd: "cortex memory stats" },
-  { label: "--version", cmd: "cortex --version" },
-  { label: "--help", cmd: "cortex --help" },
+  { label: "status", cmd: "neuralcleave status" },
+  { label: "channels list", cmd: "neuralcleave channels list" },
+  { label: "skills list", cmd: "neuralcleave skills list" },
+  { label: "plugins list", cmd: "neuralcleave plugins list" },
+  { label: "memory stats", cmd: "neuralcleave memory stats" },
+  { label: "--version", cmd: "neuralcleave --version" },
+  { label: "--help", cmd: "neuralcleave --help" },
 ];
 
 export default function TerminalPage() {
