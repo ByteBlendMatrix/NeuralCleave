@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, WifiOff } from "lucide-react";
-import api from "@/lib/api";
 
 interface GatewayStatus {
   status: string;
