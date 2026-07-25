@@ -1031,3 +1031,123 @@ def test_apply_model_settings_all_valid_providers(client):
         resp = client.post("/api/v1/settings/model", json={"provider": provider})
         assert resp.status_code == 200, f"provider={provider!r} returned {resp.status_code}"
         assert rt._pipeline._router._forced_provider == provider
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/orchestrator/status  — web-UI shape regression tests
+# ---------------------------------------------------------------------------
+
+
+from neuralcleave.gateway.routes import set_orchestrator  # noqa: E402
+
+
+class _FakeNodeConfig:
+    def __init__(self, name: str, enabled: bool = True):
+        self.name = name
+        self.enabled = enabled
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "description": f"desc-{self.name}",
+            "enabled": self.enabled,
+            "priority": 1,
+            "task_types": ["general"],
+            "routing_keywords": [],
+            "memory_namespace": self.name,
+            "effective_memory_namespace": self.name,
+            "model_override": None,
+            "max_concurrent": 4,
+        }
+
+
+class _FakeNode:
+    def __init__(self, name: str, enabled: bool = True):
+        self.config = _FakeNodeConfig(name, enabled)
+
+
+class _FakeOrchestrator:
+    def __init__(self, nodes: list):
+        self._nodes = nodes
+
+    def list_nodes(self):
+        return self._nodes
+
+    def stats(self) -> dict:
+        return {
+            "total_routed": 7,
+            "node_count": len(self._nodes),
+            "has_fallback": False,
+            "nodes": [{"name": n.config.name} for n in self._nodes],
+            "namespaces": {n.config.name: n.config.name for n in self._nodes},
+        }
+
+    def get_node_namespaces(self) -> dict:
+        return {n.config.name: n.config.name for n in self._nodes}
+
+
+@pytest.fixture(autouse=True)
+def reset_orchestrator():
+    set_orchestrator(None)
+    yield
+    set_orchestrator(None)
+
+
+def test_orchestrator_status_no_orchestrator_returns_zeros(client):
+    """When no orchestrator is injected the endpoint must return safe zero values."""
+    resp = client.get("/api/v1/orchestrator/status")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["available"] is False
+    assert body["total_nodes"] == 0
+    assert body["enabled_nodes"] == 0
+    assert body["nodes"] == []
+    assert body["namespaces"] == {}
+
+
+def test_orchestrator_status_total_nodes(client):
+    """total_nodes must equal the number of registered nodes."""
+    set_orchestrator(_FakeOrchestrator([_FakeNode("a"), _FakeNode("b")]))
+    body = client.get("/api/v1/orchestrator/status").json()
+    assert body["available"] is True
+    assert body["total_nodes"] == 2
+
+
+def test_orchestrator_status_enabled_nodes(client):
+    """enabled_nodes must count only nodes where config.enabled is True."""
+    set_orchestrator(
+        _FakeOrchestrator([_FakeNode("a", enabled=True), _FakeNode("b", enabled=False)])
+    )
+    body = client.get("/api/v1/orchestrator/status").json()
+    assert body["enabled_nodes"] == 1
+    assert body["total_nodes"] == 2
+
+
+def test_orchestrator_status_nodes_use_full_config(client):
+    """nodes array must contain full config fields, not just stats-only fields."""
+    set_orchestrator(_FakeOrchestrator([_FakeNode("alpha")]))
+    body = client.get("/api/v1/orchestrator/status").json()
+    node = body["nodes"][0]
+    # Full config fields expected by the web UI's NodeCard
+    assert node["name"] == "alpha"
+    assert "priority" in node
+    assert "task_types" in node
+    assert "memory_namespace" in node
+    assert "effective_memory_namespace" in node
+    assert "max_concurrent" in node
+
+
+def test_orchestrator_status_no_nodes_empty_list(client):
+    """An orchestrator with no nodes must return an empty nodes list."""
+    set_orchestrator(_FakeOrchestrator([]))
+    body = client.get("/api/v1/orchestrator/status").json()
+    assert body["nodes"] == []
+    assert body["total_nodes"] == 0
+    assert body["enabled_nodes"] == 0
+
+
+def test_orchestrator_status_preserves_routing_stats(client):
+    """total_routed from orch.stats() must still be present in the response."""
+    set_orchestrator(_FakeOrchestrator([_FakeNode("x")]))
+    body = client.get("/api/v1/orchestrator/status").json()
+    assert body["total_routed"] == 7
