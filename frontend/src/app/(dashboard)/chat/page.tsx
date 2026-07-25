@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, FormEvent, KeyboardEvent } from "react";
-import { MessageSquare, Send, Loader2, Terminal } from "lucide-react";
+import { MessageSquare, Send, Loader2, Terminal, Download } from "lucide-react";
+import type { ChatMessage } from "@/store/chat";
 import { gatewayWS, type WSMessage } from "@/lib/websocket";
 import { useChatStore } from "@/store/chat";
 import {
@@ -163,6 +164,38 @@ function CommandPalette({
 }
 
 // ---------------------------------------------------------------------------
+// Export helper
+// ---------------------------------------------------------------------------
+
+function exportChatAsMarkdown(messages: ChatMessage[]): void {
+  const lines: string[] = [
+    "# NeuralCleave Chat Export",
+    `> Exported ${new Date().toLocaleString()}`,
+    "",
+  ];
+  for (const m of messages) {
+    const time = new Date(m.timestamp * 1000).toLocaleTimeString();
+    if (m.role === "user") {
+      lines.push(`**You** *(${time})*`);
+    } else if (m.role === "agent") {
+      lines.push(`**NeuralCleave** *(${time})*`);
+    } else {
+      lines.push(`**Error** *(${time})*`);
+    }
+    lines.push("", m.text, "");
+  }
+  const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `neuralcleave-chat-${new Date().toISOString().slice(0, 10)}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ---------------------------------------------------------------------------
 // Main chat page
 // ---------------------------------------------------------------------------
 
@@ -313,11 +346,23 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full flex-col space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Chat</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Talk to the agent — type <code className="rounded bg-slate-800 px-1 text-xs">/</code> for commands
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Chat</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Talk to the agent — type <code className="rounded bg-slate-800 px-1 text-xs">/</code> for commands
+          </p>
+        </div>
+        {messages.length > 0 && (
+          <button
+            onClick={() => exportChatAsMarkdown(messages)}
+            title="Export conversation as Markdown"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-300 transition hover:border-indigo-500 hover:text-white"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </button>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col rounded-xl border border-slate-800 bg-slate-900">
