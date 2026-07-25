@@ -778,13 +778,14 @@ async def orchestrator_status() -> dict:
         }
     stats = orch.stats()
     stats["available"] = True
+    # list_nodes() returns AgentNodeConfig objects directly (not AgentNode wrappers)
     node_list = orch.list_nodes()
     # UI aliases — the raw stats() dict uses node_count; web UI reads total_nodes
     stats["total_nodes"] = len(node_list)
-    stats["enabled_nodes"] = sum(1 for n in node_list if n.config.enabled)
+    stats["enabled_nodes"] = sum(1 for n in node_list if n.enabled)
     # Replace lightweight stats-only node entries with full config dicts so the
     # web UI can render priority, task_types, memory_namespace, etc.
-    stats["nodes"] = [n.config.to_dict() for n in node_list]
+    stats["nodes"] = [n.to_dict() for n in node_list]
     return stats
 
 

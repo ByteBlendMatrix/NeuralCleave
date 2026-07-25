@@ -1042,6 +1042,8 @@ from neuralcleave.gateway.routes import set_orchestrator  # noqa: E402
 
 
 class _FakeNodeConfig:
+    """Mimics AgentNodeConfig — list_nodes() returns these directly."""
+
     def __init__(self, name: str, enabled: bool = True):
         self.name = name
         self.enabled = enabled
@@ -1061,29 +1063,25 @@ class _FakeNodeConfig:
         }
 
 
-class _FakeNode:
-    def __init__(self, name: str, enabled: bool = True):
-        self.config = _FakeNodeConfig(name, enabled)
-
-
 class _FakeOrchestrator:
-    def __init__(self, nodes: list):
-        self._nodes = nodes
+    def __init__(self, configs: list):
+        self._configs = configs
 
     def list_nodes(self):
-        return self._nodes
+        # Real list_nodes() returns AgentNodeConfig objects, not AgentNode wrappers
+        return self._configs
 
     def stats(self) -> dict:
         return {
             "total_routed": 7,
-            "node_count": len(self._nodes),
+            "node_count": len(self._configs),
             "has_fallback": False,
-            "nodes": [{"name": n.config.name} for n in self._nodes],
-            "namespaces": {n.config.name: n.config.name for n in self._nodes},
+            "nodes": [{"name": c.name} for c in self._configs],
+            "namespaces": {c.name: c.name for c in self._configs},
         }
 
     def get_node_namespaces(self) -> dict:
-        return {n.config.name: n.config.name for n in self._nodes}
+        return {c.name: c.name for c in self._configs}
 
 
 @pytest.fixture(autouse=True)
@@ -1107,16 +1105,16 @@ def test_orchestrator_status_no_orchestrator_returns_zeros(client):
 
 def test_orchestrator_status_total_nodes(client):
     """total_nodes must equal the number of registered nodes."""
-    set_orchestrator(_FakeOrchestrator([_FakeNode("a"), _FakeNode("b")]))
+    set_orchestrator(_FakeOrchestrator([_FakeNodeConfig("a"), _FakeNodeConfig("b")]))
     body = client.get("/api/v1/orchestrator/status").json()
     assert body["available"] is True
     assert body["total_nodes"] == 2
 
 
 def test_orchestrator_status_enabled_nodes(client):
-    """enabled_nodes must count only nodes where config.enabled is True."""
+    """enabled_nodes must count only nodes where enabled is True."""
     set_orchestrator(
-        _FakeOrchestrator([_FakeNode("a", enabled=True), _FakeNode("b", enabled=False)])
+        _FakeOrchestrator([_FakeNodeConfig("a", enabled=True), _FakeNodeConfig("b", enabled=False)])
     )
     body = client.get("/api/v1/orchestrator/status").json()
     assert body["enabled_nodes"] == 1
@@ -1125,7 +1123,7 @@ def test_orchestrator_status_enabled_nodes(client):
 
 def test_orchestrator_status_nodes_use_full_config(client):
     """nodes array must contain full config fields, not just stats-only fields."""
-    set_orchestrator(_FakeOrchestrator([_FakeNode("alpha")]))
+    set_orchestrator(_FakeOrchestrator([_FakeNodeConfig("alpha")]))
     body = client.get("/api/v1/orchestrator/status").json()
     node = body["nodes"][0]
     # Full config fields expected by the web UI's NodeCard
@@ -1148,6 +1146,6 @@ def test_orchestrator_status_no_nodes_empty_list(client):
 
 def test_orchestrator_status_preserves_routing_stats(client):
     """total_routed from orch.stats() must still be present in the response."""
-    set_orchestrator(_FakeOrchestrator([_FakeNode("x")]))
+    set_orchestrator(_FakeOrchestrator([_FakeNodeConfig("x")]))
     body = client.get("/api/v1/orchestrator/status").json()
     assert body["total_routed"] == 7
