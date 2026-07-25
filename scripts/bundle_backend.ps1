@@ -30,7 +30,7 @@ $TargetExe = Join-Path $BinDir "neuralcleave-backend-x86_64-pc-windows-msvc.exe"
 Write-Host "==> NeuralCleave backend bundler" -ForegroundColor Cyan
 
 # ── 1. Ensure PyInstaller is available ──────────────────────────────────────
-if (-not (Get-Command pyinstaller -ErrorAction SilentlyContinue)) {
+if (-not (python -c "import PyInstaller" 2>$null; $?)) {
     Write-Host "Installing PyInstaller..." -ForegroundColor Yellow
     pip install pyinstaller --quiet
     if ($LASTEXITCODE -ne 0) { throw "pip install pyinstaller failed" }
@@ -40,7 +40,9 @@ if (-not (Get-Command pyinstaller -ErrorAction SilentlyContinue)) {
 Write-Host "Building backend executable with PyInstaller..." -ForegroundColor Yellow
 Push-Location $RepoRoot
 try {
-    pyinstaller $SpecFile --distpath dist --workpath dist\_pyinstaller_work --noconfirm
+    # Use `python -m PyInstaller` so the installed module is found regardless
+    # of whether the pyinstaller script is on PATH (avoids PATH issues on Windows).
+    python -m PyInstaller $SpecFile --distpath dist --workpath dist\_pyinstaller_work --noconfirm
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 } finally {
     Pop-Location
