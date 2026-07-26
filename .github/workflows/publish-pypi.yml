@@ -40,6 +40,19 @@ on:
 jobs:
   publish:
     name: Build + publish
+    # Only run for known PyPI-relevant tag prefixes or manual dispatch.
+    # Desktop-only releases (v*) have no Python package to publish and
+    # should skip cleanly rather than fail.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' && (
+        startsWith(github.event.release.tag_name, 'app-v') ||
+        startsWith(github.event.release.tag_name, 'sdk-v') ||
+        startsWith(github.event.release.tag_name, 'github-plugin-v') ||
+        startsWith(github.event.release.tag_name, 'notion-plugin-v') ||
+        startsWith(github.event.release.tag_name, 'calendar-plugin-v') ||
+        startsWith(github.event.release.tag_name, 'cortexflow-deprecated-v')
+      ))
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
