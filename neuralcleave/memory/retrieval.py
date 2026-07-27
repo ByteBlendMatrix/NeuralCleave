@@ -3,9 +3,13 @@
 Orchestrates short-term (Redis), semantic (Qdrant), and long-term (SQLite)
 memory into a single ranked context assembly for the cognitive loop.
 
+Both Redis and Qdrant are optional at runtime. When unavailable the pipeline
+falls back to in-process storage so the desktop app works with zero external
+services installed.
+
 Pipeline:
     Query → Short-term inject (priority)
-          → Qdrant ANN semantic search
+          → Qdrant ANN semantic search  (in-memory cosine fallback)
           → SQLite long-term query
           → Content-hash deduplication
           → Score-rank + cap at top_k
@@ -15,12 +19,23 @@ Pipeline:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
+import math
+import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
+from neuralcleave.memory.short_term import ShortTermMemory
+
 logger = logging.getLogger(__name__)
+
+_QDRANT_COLLECTION = "NeuralCleave_memory"
+
+# Seconds to wait before re-probing Qdrant after a failed attempt.
+_QDRANT_RECHECK_INTERVAL = 30.0
 
 
 @dataclass
@@ -50,6 +65,62 @@ class RetrievalContext:
         return blocks
 
 
+# ---------------------------------------------------------------------------
+# In-process vector store (Qdrant fallback)
+# ---------------------------------------------------------------------------
+
+class _InMemoryVectorStore:
+    """Cosine-similarity search over an in-process list of vectors.
+
+    Used when Qdrant is unavailable so the desktop app retains semantic
+    memory without any external services. All callers are async and run
+    on the event loop; the list is touched only from that loop, so no
+    threading lock is required.
+    """
+
+    def __init__(self) -> None:
+        self._points: list[dict[str, Any]] = []
+
+    def upsert(self, point_id: str, vector: list[float], payload: dict[str, Any]) -> None:
+        self._points = [p for p in self._points if p["id"] != point_id]
+        self._points.append({"id": point_id, "vector": vector, "payload": payload})
+
+    def search(
+        self,
+        query: list[float],
+        top_k: int,
+        threshold: float,
+    ) -> list[tuple[str, dict[str, Any], float]]:
+        if not self._points or not query:
+            return []
+        q_norm = math.sqrt(sum(x * x for x in query))
+        if q_norm == 0.0:
+            return []
+        results: list[tuple[str, dict[str, Any], float]] = []
+        for point in self._points:
+            v = point["vector"]
+            v_norm = math.sqrt(sum(x * x for x in v))
+            if v_norm == 0.0:
+                continue
+            dot = sum(a * b for a, b in zip(query, v))
+            score = dot / (q_norm * v_norm)
+            if score >= threshold:
+                results.append((point["id"], point["payload"], score))
+        results.sort(key=lambda x: x[2], reverse=True)
+        return results[:top_k]
+
+    def __len__(self) -> int:
+        return len(self._points)
+
+
+# Module-level singleton: shared across all MemoryRetrievalPipeline instances.
+_MEM_VECTOR_STORE = _InMemoryVectorStore()
+
+
+# ---------------------------------------------------------------------------
+# MemoryRetrievalPipeline
+# ---------------------------------------------------------------------------
+
 class MemoryRetrievalPipeline:
     """Unified retrieval across all 3 memory tiers.
 
@@ -77,6 +148,42 @@ class MemoryRetrievalPipeline:
         self._qdrant_url = qdrant_url
         self._sqlite_path = sqlite_path
         self._short_term_ttl = short_term_ttl
+        # Shared short-term backend (Redis with in-memory fallback).
+        self._stm = ShortTermMemory(redis_url=redis_url, default_ttl=short_term_ttl)
+        # Qdrant probe cache: True = available, False = unavailable, None = unchecked.
+        self._qdrant_ok: bool | None = None
+        self._qdrant_check_at: float = 0.0
+
+    # ------------------------------------------------------------------
+    # Qdrant availability probe (cached, 1 s timeout)
+    # ------------------------------------------------------------------
+
+    async def _probe_qdrant(self) -> bool:
+        """Return True if Qdrant is reachable; cache result to avoid per-call checks."""
+        now = time.monotonic()
+        if self._qdrant_ok is True:
+            return True
+        if self._qdrant_ok is False and now - self._qdrant_check_at < _QDRANT_RECHECK_INTERVAL:
+            return False
+        try:
+            from qdrant_client import AsyncQdrantClient  # type: ignore[import]
+
+            client = AsyncQdrantClient(url=self._qdrant_url)
+            await asyncio.wait_for(client.get_collections(), timeout=1.0)
+            if self._qdrant_ok is not True:
+                logger.info(
+                    "retrieval: Qdrant available at %s — using Qdrant backend", self._qdrant_url
+                )
+            self._qdrant_ok = True
+        except Exception:
+            if self._qdrant_ok is not False:
+                logger.info(
+                    "retrieval: Qdrant unavailable at %s — using in-memory vector store",
+                    self._qdrant_url,
+                )
+            self._qdrant_ok = False
+            self._qdrant_check_at = now
+        return bool(self._qdrant_ok)
 
     # ------------------------------------------------------------------
     # Main entry point
@@ -135,7 +242,7 @@ class MemoryRetrievalPipeline:
     # ------------------------------------------------------------------
 
     async def store_short_term(self, key: str, value: Any, session_id: str | None = None) -> None:
-        """Store a key-value pair in Redis with session TTL.
+        """Store a key-value pair in short-term memory (Redis, with in-memory fallback).
 
         ``session_id`` overrides ``self.session_id`` for this call so the
         pipeline can supply the current session without a per-session pipeline.
@@ -145,38 +252,46 @@ class MemoryRetrievalPipeline:
         if eff_sid is None:
             logger.debug("store_short_term: skipped — no session_id available")
             return
-        try:
-            import redis.asyncio as aioredis  # type: ignore[import]
-
-            r = await aioredis.from_url(self._redis_url, decode_responses=True)
-            try:
-                import json
-
-                redis_key = f"cf:stm:{eff_sid}:{key}"
-                await r.set(redis_key, json.dumps(value), ex=self._short_term_ttl)
-            finally:
-                await r.aclose()
-        except Exception as exc:
-            logger.warning("short_term.store failed: %s", exc)
+        await self._stm.store(eff_sid, key, value)
 
     async def store_semantic(self, embedding: list[float], payload: dict[str, Any]) -> str | None:
-        """Store an embedding in Qdrant. Returns point ID or None on error."""
-        try:
-            import uuid
+        """Store an embedding in Qdrant (or in-memory fallback). Returns point ID."""
+        point_id = str(uuid.uuid4())
+        if await self._probe_qdrant():
+            try:
+                from qdrant_client import AsyncQdrantClient  # type: ignore[import]
+                from qdrant_client.models import Distance, PointStruct, VectorParams  # type: ignore[import]
 
-            from qdrant_client import AsyncQdrantClient  # type: ignore[import]
-            from qdrant_client.models import PointStruct  # type: ignore[import]
+                client = AsyncQdrantClient(url=self._qdrant_url)
+                try:
+                    await client.upsert(
+                        collection_name=_QDRANT_COLLECTION,
+                        points=[PointStruct(id=point_id, vector=embedding, payload=payload)],
+                    )
+                except Exception as e:
+                    # Collection may not exist yet — create it with the correct dimensions.
+                    if "not found" in str(e).lower() or "doesn't exist" in str(e).lower():
+                        await client.create_collection(
+                            _QDRANT_COLLECTION,
+                            vectors_config=VectorParams(
+                                size=len(embedding), distance=Distance.COSINE
+                            ),
+                        )
+                        await client.upsert(
+                            collection_name=_QDRANT_COLLECTION,
+                            points=[PointStruct(id=point_id, vector=embedding, payload=payload)],
+                        )
+                    else:
+                        raise
+                logger.debug("semantic.stored (qdrant) point_id=%s", point_id)
+                return point_id
+            except Exception as exc:
+                logger.warning("semantic.store qdrant failed, falling back to memory: %s", exc)
+                self._qdrant_ok = None  # force re-probe next call
 
-            client = AsyncQdrantClient(url=self._qdrant_url)
-            point_id = str(uuid.uuid4())
-            await client.upsert(
-                collection_name="NeuralCleave_memory",
-                points=[PointStruct(id=point_id, vector=embedding, payload=payload)],
-            )
-            return point_id
-        except Exception as exc:
-            logger.warning("semantic.store failed: %s", exc)
-            return None
+        _MEM_VECTOR_STORE.upsert(point_id, embedding, payload)
+        logger.debug("semantic.stored (memory) point_id=%s", point_id)
+        return point_id
 
     # ------------------------------------------------------------------
     # Pruning (called by daily scheduled task)
@@ -216,7 +331,7 @@ class MemoryRetrievalPipeline:
 
             client = AsyncQdrantClient(url=self._qdrant_url)
             scroll_result, _ = await client.scroll(
-                collection_name="NeuralCleave_memory",
+                collection_name=_QDRANT_COLLECTION,
                 limit=500,
                 with_vectors=False,
             )
@@ -230,7 +345,7 @@ class MemoryRetrievalPipeline:
                     seen.add(pid)
             if to_delete:
                 await client.delete(
-                    collection_name="NeuralCleave_memory",
+                    collection_name=_QDRANT_COLLECTION,
                     points_selector=to_delete,
                 )
                 deduplicated = len(to_delete)
@@ -248,59 +363,56 @@ class MemoryRetrievalPipeline:
         eff_sid = session_id if session_id is not None else self.session_id
         if eff_sid is None:
             return []
-        results: list[MemoryResult] = []
-        try:
-            import json
-
-            import redis.asyncio as aioredis  # type: ignore[import]
-
-            r = await aioredis.from_url(self._redis_url, decode_responses=True)
-            try:
-                pattern = f"cf:stm:{eff_sid}:*"
-                keys = await r.keys(pattern)
-                for key in keys[:20]:
-                    raw = await r.get(key)
-                    if raw:
-                        results.append(
-                            MemoryResult(
-                                source="short_term",
-                                content=json.loads(raw),
-                                score=1.0,
-                                metadata={"key": key},
-                            )
-                        )
-            finally:
-                await r.aclose()
-        except Exception as exc:
-            logger.warning("short_term.retrieve failed: %s", exc)
-        return results
+        entries = await self._stm.get_all(eff_sid, limit=20)
+        return [
+            MemoryResult(
+                source="short_term",
+                content=value,
+                score=1.0,
+                metadata={"key": key},
+            )
+            for key, value in entries.items()
+        ]
 
     async def _semantic(
         self, embedding: list[float], *, top_k: int, threshold: float
     ) -> list[MemoryResult]:
-        results: list[MemoryResult] = []
-        try:
-            from qdrant_client import AsyncQdrantClient  # type: ignore[import]
+        if await self._probe_qdrant():
+            try:
+                from qdrant_client import AsyncQdrantClient  # type: ignore[import]
 
-            client = AsyncQdrantClient(url=self._qdrant_url)
-            hits = await client.search(
-                collection_name="NeuralCleave_memory",
-                query_vector=embedding,
-                limit=top_k,
-                score_threshold=threshold,
-            )
-            for hit in hits:
-                results.append(
+                client = AsyncQdrantClient(url=self._qdrant_url)
+                hits = await client.search(
+                    collection_name=_QDRANT_COLLECTION,
+                    query_vector=embedding,
+                    limit=top_k,
+                    score_threshold=threshold,
+                )
+                logger.debug("semantic.retrieved (qdrant) hits=%d", len(hits))
+                return [
                     MemoryResult(
                         source="semantic",
                         content=hit.payload,
                         score=hit.score,
                         metadata={"point_id": str(hit.id)},
                     )
-                )
-        except Exception as exc:
-            logger.warning("semantic.retrieve failed: %s", exc)
-        return results
+                    for hit in hits
+                ]
+            except Exception as exc:
+                logger.warning("semantic.retrieve qdrant failed, falling back to memory: %s", exc)
+                self._qdrant_ok = None
+
+        hits_mem = _MEM_VECTOR_STORE.search(embedding, top_k, threshold)
+        logger.debug("semantic.retrieved (memory) hits=%d", len(hits_mem))
+        return [
+            MemoryResult(
+                source="semantic",
+                content=payload,
+                score=score,
+                metadata={"point_id": point_id, "fallback": True},
+            )
+            for point_id, payload, score in hits_mem
+        ]
 
     async def _long_term(self, limit: int = 20, query: str = "", session_id: str | None = None) -> list[MemoryResult]:
         """Fetch long-term entries ranked by importance, optionally filtered by query text.
