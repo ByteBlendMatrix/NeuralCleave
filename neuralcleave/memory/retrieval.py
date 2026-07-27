@@ -260,7 +260,11 @@ class MemoryRetrievalPipeline:
         if await self._probe_qdrant():
             try:
                 from qdrant_client import AsyncQdrantClient  # type: ignore[import]
-                from qdrant_client.models import Distance, PointStruct, VectorParams  # type: ignore[import]
+                from qdrant_client.models import (  # type: ignore[import]
+                    Distance,
+                    PointStruct,
+                    VectorParams,
+                )
 
                 client = AsyncQdrantClient(url=self._qdrant_url)
                 try:
