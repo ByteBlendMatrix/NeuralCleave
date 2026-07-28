@@ -24,6 +24,10 @@
 
 <br/>
 
+[![Product Hunt](https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1204947&theme=light&t=1785211358075)](https://www.producthunt.com/products/neuralcleave)
+
+<br/>
+
 > **One AI assistant. 32 channels. 13 LLM providers. Smarter memory. No lock-in.**
 
 <br/>
@@ -50,7 +54,7 @@ NeuralCleave is a **personal AI assistant gateway** — a single Python backend 
 - **Plugin SDK** — typed Python ABCs, PEP 451 entry-points, hot-reload, Hub marketplace with PackageScanner safety gate
 - **Desktop app** — Tauri v2 (Windows / macOS / Linux) with system tray, global hotkey, and embedded terminal
 - **PWA** — installable on iOS + Android from the gateway's own `/app` endpoint, no app store needed
-- **5,064 tests** — every subsystem unit-tested, all passing
+- **5,076 tests** — every subsystem unit-tested, all passing
 
 ```
 You (any channel) → NeuralCleave Gateway → Smart Memory → Best Model → Reflection → Reply
@@ -83,7 +87,7 @@ You (any channel) → NeuralCleave Gateway → Smart Memory → Best Model → R
 | Structured logging | stdout | ✅ JsonFormatter + ContextLogger |
 | REST API surface | Limited docs | ✅ 41 documented endpoints + OpenAPI |
 | Channels | ~29 | **32** |
-| Tests | ~200 | **5,064** |
+| Tests | ~200 | **5,076** |
 
 ---
 
@@ -612,7 +616,7 @@ See the full [Deployment guide](https://docs.neuralcleave.com/docs/deployment.ht
 ```bash
 pip install -e ".[dev]"
 
-pytest                                              # all 5,064 tests
+pytest                                              # all 5,076 tests
 pytest tests/unit/test_memory.py -v                # single module
 pytest -k "telegram" -v                            # by keyword
 pytest --cov=backend --cov-report=term-missing     # with coverage
@@ -650,7 +654,7 @@ NeuralCleave/
 │   ├── COMPETITIVE_ANALYSIS_OPENCLAW.md
 │   └── IMPLEMENTATION_PLAN_v2.md
 ├── tests/
-│   ├── unit/              5,064 tests, all passing
+│   ├── unit/              5,076 tests, all passing
 │   └── integration/
 ├── scripts/               install.sh, install.ps1, bundle_backend.*
 ├── .github/workflows/     ci.yml, plugins.yml, deploy-docs.yml, build-tauri.yml
