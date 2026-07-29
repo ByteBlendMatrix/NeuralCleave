@@ -254,47 +254,100 @@ neuralcleave start</code></pre>
 
       <h2>Screenshots</h2>
       <div class="screenshot-gallery">
-        <div class="screenshot-card">
-          <img src="screenshots/chat.png" alt="Chat" loading="lazy" />
-          <div class="screenshot-card-label">Chat</div>
+        <!-- Featured 2-up row -->
+        <div class="ss-featured">
+          <div class="ss-card">
+            <img src="screenshots/chat.png" alt="Chat" loading="lazy" />
+            <div class="ss-label"><span class="ss-num">01</span><span class="ss-name">Chat</span></div>
+          </div>
+          <div class="ss-card">
+            <img src="screenshots/dashboard.png" alt="Dashboard" loading="lazy" />
+            <div class="ss-label"><span class="ss-num">02</span><span class="ss-name">Dashboard</span></div>
+          </div>
         </div>
-        <div class="screenshot-card">
-          <img src="screenshots/dashboard.png" alt="Dashboard" loading="lazy" />
-          <div class="screenshot-card-label">Dashboard</div>
-        </div>
-        <div class="screenshot-card">
-          <img src="screenshots/memory.png" alt="Memory" loading="lazy" />
-          <div class="screenshot-card-label">Memory</div>
-        </div>
-        <div class="screenshot-card">
-          <img src="screenshots/channel.png" alt="Channels" loading="lazy" />
-          <div class="screenshot-card-label">Channels</div>
-        </div>
-        <div class="screenshot-card">
-          <img src="screenshots/orchestrator.png" alt="Orchestrator" loading="lazy" />
-          <div class="screenshot-card-label">Orchestrator</div>
-        </div>
-        <div class="screenshot-card">
-          <img src="screenshots/skills.png" alt="Skills" loading="lazy" />
-          <div class="screenshot-card-label">Skills</div>
-        </div>
-        <div class="screenshot-card">
-          <img src="screenshots/canvas.png" alt="Canvas" loading="lazy" />
-          <div class="screenshot-card-label">Canvas</div>
-        </div>
-        <div class="screenshot-card">
-          <img src="screenshots/terminal.png" alt="Terminal" loading="lazy" />
-          <div class="screenshot-card-label">Terminal</div>
-        </div>
-        <div class="screenshot-card">
-          <img src="screenshots/observability.png" alt="Observability" loading="lazy" />
-          <div class="screenshot-card-label">Observability</div>
-        </div>
-        <div class="screenshot-card">
-          <img src="screenshots/settings.png" alt="Settings" loading="lazy" />
-          <div class="screenshot-card-label">Settings</div>
+        <!-- 4-column grid -->
+        <div class="ss-grid">
+          <div class="ss-card">
+            <img src="screenshots/memory.png" alt="Memory" loading="lazy" />
+            <div class="ss-label"><span class="ss-num">03</span><span class="ss-name">Memory</span></div>
+          </div>
+          <div class="ss-card">
+            <img src="screenshots/channel.png" alt="Channels" loading="lazy" />
+            <div class="ss-label"><span class="ss-num">04</span><span class="ss-name">Channels</span></div>
+          </div>
+          <div class="ss-card">
+            <img src="screenshots/orchestrator.png" alt="Orchestrator" loading="lazy" />
+            <div class="ss-label"><span class="ss-num">05</span><span class="ss-name">Orchestrator</span></div>
+          </div>
+          <div class="ss-card">
+            <img src="screenshots/skills.png" alt="Skills" loading="lazy" />
+            <div class="ss-label"><span class="ss-num">06</span><span class="ss-name">Skills</span></div>
+          </div>
+          <div class="ss-card">
+            <img src="screenshots/canvas.png" alt="Canvas" loading="lazy" />
+            <div class="ss-label"><span class="ss-num">07</span><span class="ss-name">Canvas</span></div>
+          </div>
+          <div class="ss-card">
+            <img src="screenshots/terminal.png" alt="Terminal" loading="lazy" />
+            <div class="ss-label"><span class="ss-num">08</span><span class="ss-name">Terminal</span></div>
+          </div>
+          <div class="ss-card">
+            <img src="screenshots/observability.png" alt="Observability" loading="lazy" />
+            <div class="ss-label"><span class="ss-num">09</span><span class="ss-name">Observability</span></div>
+          </div>
+          <div class="ss-card">
+            <img src="screenshots/settings.png" alt="Settings" loading="lazy" />
+            <div class="ss-label"><span class="ss-num">10</span><span class="ss-name">Settings</span></div>
+          </div>
         </div>
       </div>
+      <script>
+      (function () {
+        const cards = document.querySelectorAll('.ss-card');
+        const DEG   = 8;   // max tilt degrees
+        const SCALE = 1.025;
+
+        cards.forEach(function (card) {
+          // 3D tilt + spotlight on mousemove
+          card.addEventListener('mousemove', function (e) {
+            const r  = card.getBoundingClientRect();
+            const x  = e.clientX - r.left;
+            const y  = e.clientY - r.top;
+            const cx = r.width  / 2;
+            const cy = r.height / 2;
+            const rx = -((y - cy) / cy) * DEG;
+            const ry =  ((x - cx) / cx) * DEG;
+            card.style.transform =
+              'perspective(900px) rotateX(' + rx + 'deg) rotateY(' + ry + 'deg) scale(' + SCALE + ')';
+            card.style.setProperty('--gx', x + 'px');
+            card.style.setProperty('--gy', y + 'px');
+          });
+
+          // Reset on leave
+          card.addEventListener('mouseleave', function () {
+            card.style.transform = '';
+          });
+        });
+
+        // Stagger-in via IntersectionObserver
+        if ('IntersectionObserver' in window) {
+          var obs = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+              if (!entry.isIntersecting) return;
+              entry.target.classList.add('ss-visible');
+              obs.unobserve(entry.target);
+            });
+          }, { threshold: 0.08 });
+
+          cards.forEach(function (c, i) {
+            c.style.animationDelay = (i * 55) + 'ms';
+            obs.observe(c);
+          });
+        } else {
+          cards.forEach(function (c) { c.style.opacity = '1'; });
+        }
+      })();
+      </script>
 
       <h2>Repository layout</h2>
       <div class="table-wrap">
