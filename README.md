@@ -13,7 +13,7 @@
 [![License: BUSL 1.1](https://img.shields.io/badge/License-BUSL%201.1-blue.svg?style=for-the-badge)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Latest-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Tests](https://img.shields.io/badge/Tests-5%2C064%20passing-brightgreen?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-5%2C076%20passing-brightgreen?style=for-the-badge)](tests/)
 [![Version](https://img.shields.io/badge/Version-2.1.4-7C6FFF?style=for-the-badge)](https://github.com/TheAmitChandra/NeuralCleave/releases)
 
 <br/>
