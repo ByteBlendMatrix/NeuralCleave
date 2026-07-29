@@ -303,33 +303,32 @@ neuralcleave start</code></pre>
       </div>
       <script>
       (function () {
-        const cards = document.querySelectorAll('.ss-card');
-        const DEG   = 8;   // max tilt degrees
-        const SCALE = 1.025;
+        var cards = Array.prototype.slice.call(document.querySelectorAll('.ss-card'));
+        var DEG   = 8;
+        var SCALE = 1.025;
+        var currentIdx = 0;
 
+        /* ── 3D tilt + spotlight ─────────────────────────────────────────── */
         cards.forEach(function (card) {
-          // 3D tilt + spotlight on mousemove
           card.addEventListener('mousemove', function (e) {
-            const r  = card.getBoundingClientRect();
-            const x  = e.clientX - r.left;
-            const y  = e.clientY - r.top;
-            const cx = r.width  / 2;
-            const cy = r.height / 2;
-            const rx = -((y - cy) / cy) * DEG;
-            const ry =  ((x - cx) / cx) * DEG;
+            var r  = card.getBoundingClientRect();
+            var x  = e.clientX - r.left;
+            var y  = e.clientY - r.top;
+            var cx = r.width  / 2;
+            var cy = r.height / 2;
+            var rx = -((y - cy) / cy) * DEG;
+            var ry =  ((x - cx) / cx) * DEG;
             card.style.transform =
               'perspective(900px) rotateX(' + rx + 'deg) rotateY(' + ry + 'deg) scale(' + SCALE + ')';
             card.style.setProperty('--gx', x + 'px');
             card.style.setProperty('--gy', y + 'px');
           });
-
-          // Reset on leave
           card.addEventListener('mouseleave', function () {
             card.style.transform = '';
           });
         });
 
-        // Stagger-in via IntersectionObserver
+        /* ── Stagger-in via IntersectionObserver ─────────────────────────── */
         if ('IntersectionObserver' in window) {
           var obs = new IntersectionObserver(function (entries) {
             entries.forEach(function (entry) {
@@ -346,6 +345,73 @@ neuralcleave start</code></pre>
         } else {
           cards.forEach(function (c) { c.style.opacity = '1'; });
         }
+
+        /* ── Lightbox ────────────────────────────────────────────────────── */
+        var lb = document.createElement('div');
+        lb.className = 'ss-lightbox';
+        lb.setAttribute('role', 'dialog');
+        lb.setAttribute('aria-modal', 'true');
+        lb.innerHTML =
+          '<div class="ss-lb-inner">' +
+            '<img class="ss-lb-img" alt="" />' +
+            '<div class="ss-lb-bar">' +
+              '<span class="ss-num ss-lb-num"></span>' +
+              '<span class="ss-name ss-lb-name"></span>' +
+            '</div>' +
+          '</div>' +
+          '<button class="ss-lb-close" aria-label="Close">&times;</button>' +
+          '<button class="ss-lb-nav ss-lb-prev" aria-label="Previous">&#8592;</button>' +
+          '<button class="ss-lb-nav ss-lb-next" aria-label="Next">&#8594;</button>';
+        document.body.appendChild(lb);
+
+        var lbImg   = lb.querySelector('.ss-lb-img');
+        var lbNum   = lb.querySelector('.ss-lb-num');
+        var lbName  = lb.querySelector('.ss-lb-name');
+        var lbClose = lb.querySelector('.ss-lb-close');
+        var lbPrev  = lb.querySelector('.ss-lb-prev');
+        var lbNext  = lb.querySelector('.ss-lb-next');
+
+        function showCard(idx) {
+          currentIdx = (idx + cards.length) % cards.length;
+          var card   = cards[currentIdx];
+          var img    = card.querySelector('img');
+          var numEl  = card.querySelector('.ss-num');
+          var nameEl = card.querySelector('.ss-name');
+          lbImg.src            = img ? img.src : '';
+          lbImg.alt            = img ? img.alt : '';
+          lbNum.textContent    = numEl  ? numEl.textContent  : '';
+          lbName.textContent   = nameEl ? nameEl.textContent : '';
+        }
+
+        function openLb(idx) {
+          showCard(idx);
+          lb.classList.add('ss-lb-open');
+          document.body.style.overflow = 'hidden';
+        }
+
+        function closeLb() {
+          lb.classList.remove('ss-lb-open');
+          document.body.style.overflow = '';
+        }
+
+        cards.forEach(function (card, i) {
+          card.style.cursor = 'zoom-in';
+          card.addEventListener('click', function () { openLb(i); });
+        });
+
+        lb.addEventListener('click', function (e) {
+          if (e.target === lb) closeLb();
+        });
+        lbClose.addEventListener('click', closeLb);
+        lbPrev.addEventListener('click', function (e) { e.stopPropagation(); showCard(currentIdx - 1); });
+        lbNext.addEventListener('click', function (e) { e.stopPropagation(); showCard(currentIdx + 1); });
+
+        document.addEventListener('keydown', function (e) {
+          if (!lb.classList.contains('ss-lb-open')) return;
+          if (e.key === 'Escape')      closeLb();
+          if (e.key === 'ArrowLeft')  showCard(currentIdx - 1);
+          if (e.key === 'ArrowRight') showCard(currentIdx + 1);
+        });
       })();
       </script>
 
