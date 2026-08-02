@@ -31,7 +31,7 @@ describe("GatewayToast", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("shows 'Gateway is online' toast when gateway comes online", async () => {
+  it("shows 'NeuralCleave is ready' toast when gateway comes online", async () => {
     const client = makeClient();
     // Baseline: offline (no cache entry)
     renderWithClient(client);
